@@ -2,114 +2,110 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Pro AR Navigation</title>
+    <title>Indoor AR Nav</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
-        #ui-panel {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            width: 85%; background: rgba(0,0,0,0.8); color: white;
-            padding: 15px; border-radius: 15px; font-family: 'Segoe UI', sans-serif;
-            z-index: 100; text-align: center; border: 2px solid #00ff00;
+        /* Start ekrani - "Enter AR" tugmasi o'rniga */
+        #welcome-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #001a33; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 9999;
+            color: white; font-family: sans-serif;
         }
-        .dist-text { font-size: 24px; font-weight: bold; color: #00ff00; }
-        .info-text { font-size: 14px; opacity: 0.8; }
+        #start-btn {
+            padding: 20px 40px; font-size: 20px; background: #00ff00;
+            border: none; border-radius: 50px; cursor: pointer; font-weight: bold;
+        }
+        #ui-overlay {
+            position: absolute; bottom: 20px; width: 100%; text-align: center;
+            z-index: 100; color: white; display: none;
+        }
     </style>
 </head>
 <body>
 
-    <div id="ui-panel">
-        <div id="room-name">Yuklanmoqda...</div>
-        <div class="dist-text"><span id="meter">0</span> m</div>
-        <div id="status" class="info-text">Siz 6DoF rejimidasiz (Yuring)</div>
+    <div id="welcome-screen">
+        <h2>103-xonaga navigatsiya</h2>
+        <p>Tayyor bo'lsangiz tugmani bosing</p>
+        <button id="start-btn">BOSHLASH</button>
     </div>
 
-    <a-scene webxr="requiredFeatures: local-floor">
+    <div id="ui-overlay">
+        <h1 style="margin:0;"><span id="dist">0</span> m</h1>
+        <p id="hint">O'ngga buriling!</p>
+    </div>
+
+    <a-scene webxr="requiredFeatures: local-floor" arjs-device-indicator="false">
         <a-assets>
-            <a-mixin id="arrow-style" 
-                geometry="primitive: cone; radiusBottom: 0.15; height: 0.4" 
-                material="color: #00ff00; opacity: 0.8; emissive: #00ff00"
-                animation="property: position; dir: alternate; dur: 1000; easing: easeInOutSine; loop: true; to: 0 0.2 0">
-            </a-mixin>
+            <img id="blue-arrow" src="https://cdn-icons-png.flaticon.com/512/545/545682.png">
+            <img id="goal-icon" src="https://cdn-icons-png.flaticon.com/512/684/684908.png">
         </a-assets>
 
-        <a-camera id="user-cam" position="0 1.6 0"></a-camera>
+        <a-camera id="cam" position="0 1.6 0"></a-camera>
 
-        <a-entity id="world"></a-entity>
+        <a-image id="turn-right-sign" src="#blue-arrow" 
+                 position="0 1.5 -1" scale="0.5 0.5 0.5"
+                 animation="property: scale; to: 0.6 0.6 0.6; dir: alternate; loop: true; dur: 500">
+        </a-image>
+
+        <a-entity id="path-container"></a-entity>
+
+        <a-image id="destination" src="#goal-icon" position="10 1 -1" visible="false"></a-image>
     </a-scene>
 
     <script>
-        // 1. Xonalar ma'lumotlar bazasi (Koridor bo'ylab koordinatalar)
-        const rooms = {
-            "101": { x: 5, z: -2, label: "101-Xona (O'ngda)" },
-            "102": { x: -5, z: -5, label: "102-Xona (Chapda)" },
-            "103": { x: 0, z: -15, label: "103-Xona (To'g'rida)" },
-            "105": { x: 3, z: -20, label: "Adminstratsiya" }
-        };
+        const startBtn = document.querySelector('#start-btn');
+        const welcomeScreen = document.querySelector('#welcome-screen');
+        const scene = document.querySelector('a-scene');
+        const overlay = document.querySelector('#ui-overlay');
+        const pathContainer = document.querySelector('#path-container');
+        const turnSign = document.querySelector('#turn-right-sign');
 
-        // URL'dan xonani aniqlash: ?room=103
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetRoom = urlParams.get('room') || "103";
-        const targetData = rooms[targetRoom];
+        // Navigatsiya boshlanishi (Tugma bosilganda)
+        startBtn.addEventListener('click', () => {
+            scene.enterAR(); // AR sessiyani boshlash
+            welcomeScreen.style.display = 'none';
+            overlay.style.display = 'block';
+            generatePath();
+        });
 
-        const world = document.querySelector('#world');
-        const meterEl = document.querySelector('#meter');
-        const roomNameEl = document.querySelector('#room-name');
-        const statusEl = document.querySelector('#status');
-
-        if (targetData) {
-            roomNameEl.innerText = targetData.label;
-            setupNavigation(targetData);
-        }
-
-        function setupNavigation(data) {
-            // 2. Yo'lga strelkalarni tizish (Har 1.5 metrda)
-            const steps = Math.abs(data.z) / 1.5;
-            for (let i = 1; i <= steps; i++) {
-                let s = document.createElement('a-entity');
-                s.setAttribute('mixin', 'arrow-style');
-                // Strelkalarni Z o'qi bo'ylab (to'g'riga) tizish
-                s.setAttribute('position', `0 0.1 ${-i * 1.5}`);
-                s.setAttribute('rotation', '-90 0 0');
-                world.appendChild(s);
+        function generatePath() {
+            // Faraz qilaylik, 10 metr o'ngga yurish kerak
+            for (let i = 1; i <= 10; i++) {
+                let arrow = document.createElement('a-image');
+                arrow.setAttribute('src', '#blue-arrow');
+                // Yerda yotishi uchun rotation (X o'qi -90)
+                // O'ngga yurish uchun: X o'sib boradi
+                arrow.setAttribute('position', `${i} 0.05 0`);
+                arrow.setAttribute('rotation', '-90 0 -90'); 
+                arrow.setAttribute('scale', '0.4 0.4 0.4');
+                pathContainer.appendChild(arrow);
             }
-
-            // 3. Xonaning o'ziga belgi qo'yish
-            let goal = document.createElement('a-sphere');
-            goal.setAttribute('position', `${data.x} 0.5 ${data.z}`);
-            goal.setAttribute('radius', '0.5');
-            goal.setAttribute('color', '#ff0000');
-            world.appendChild(goal);
         }
 
-        // 4. 6DoF va 3DoF aniqlash va Masofa o'lchash
-        AFRAME.registerComponent('nav-engine', {
+        // 6DoF logic: Masofani kuzatish
+        AFRAME.registerComponent('nav-logic', {
             tick: function () {
-                const camPos = document.querySelector('#user-cam').object3D.position;
+                let camPos = document.querySelector('#cam').object3D.position;
+                let targetPos = {x: 10, z: 0};
                 
-                // 3DoF vs 6DoF tekshiruvi (Oddiy usul: agar pozitsiya o'zgarmasa)
-                if (camPos.x === 0 && camPos.z === 0) {
-                    statusEl.innerText = "Eski telefon: Faqat yo'nalishni ko'rsatadi (3DoF)";
-                    statusEl.style.color = "yellow";
+                let dist = Math.sqrt(Math.pow(targetPos.x - camPos.x, 2) + Math.pow(targetPos.z - camPos.z, 2));
+                document.querySelector('#dist').innerText = dist.toFixed(1);
+
+                // Agar foydalanuvchi o'ngga burilsa/yursa, startdagi belgini o'chirish
+                if (camPos.x > 0.5) {
+                    turnSign.setAttribute('visible', 'false');
+                    document.querySelector('#hint').innerText = "To'g'riga yuring";
                 }
 
-                if (targetData) {
-                    const dist = Math.sqrt(
-                        Math.pow(targetData.x - camPos.x, 2) + 
-                        Math.pow(targetData.z - camPos.z, 2)
-                    );
-                    
-                    meterEl.innerText = dist.toFixed(1);
-
-                    if (dist < 2) {
-                        statusEl.innerText = "Manzilga yetdingiz!";
-                        statusEl.style.color = "#00ff00";
-                        roomNameEl.style.color = "#00ff00";
-                    }
+                if (dist < 1.5) {
+                    document.querySelector('#hint').innerText = "YETIB KELDINGIZ!";
+                    document.querySelector('#hint').style.color = "#00ff00";
                 }
             }
         });
 
-        document.querySelector('a-scene').setAttribute('nav-engine', '');
+        scene.setAttribute('nav-logic', '');
     </script>
 </body>
 </html>
