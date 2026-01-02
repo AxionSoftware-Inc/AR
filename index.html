@@ -1,90 +1,115 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <meta charset="utf-8">
-    <title>WebXR 6DoF Navigation</title>
+    <title>Pro AR Navigation</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
-      #overlay {
-        position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-        z-index: 10; background: rgba(0,0,0,0.7); color: white;
-        padding: 15px; border-radius: 10px; font-family: sans-serif; text-align: center;
-        width: 80%; pointer-events: none; display: none;
-      }
+        #ui-panel {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            width: 85%; background: rgba(0,0,0,0.8); color: white;
+            padding: 15px; border-radius: 15px; font-family: 'Segoe UI', sans-serif;
+            z-index: 100; text-align: center; border: 2px solid #00ff00;
+        }
+        .dist-text { font-size: 24px; font-weight: bold; color: #00ff00; }
+        .info-text { font-size: 14px; opacity: 0.8; }
     </style>
-  </head>
-  <body>
+</head>
+<body>
 
-    <div id="overlay">Siz 103-xonaga yetib keldingiz!</div>
+    <div id="ui-panel">
+        <div id="room-name">Yuklanmoqda...</div>
+        <div class="dist-text"><span id="meter">0</span> m</div>
+        <div id="status" class="info-text">Siz 6DoF rejimidasiz (Yuring)</div>
+    </div>
 
-    <a-scene webxr="requiredFeatures: local-floor, hit-test">
-      
-      <a-assets>
-        <a-mixin id="arrow-mesh" 
-                 geometry="primitive: cone; radiusBottom: 0.1; height: 0.3" 
-                 material="color: #00FF00; emissive: #00FF00" 
-                 rotation="90 0 0"></a-mixin>
-      </a-assets>
+    <a-scene webxr="requiredFeatures: local-floor">
+        <a-assets>
+            <a-mixin id="arrow-style" 
+                geometry="primitive: cone; radiusBottom: 0.15; height: 0.4" 
+                material="color: #00ff00; opacity: 0.8; emissive: #00ff00"
+                animation="property: position; dir: alternate; dur: 1000; easing: easeInOutSine; loop: true; to: 0 0.2 0">
+            </a-mixin>
+        </a-assets>
 
-      <a-camera id="camera" look-controls wasd-controls position="0 1.6 0">
-        <a-entity cursor="fuse: false; rayOrigin: mouse"></a-entity>
-      </a-camera>
+        <a-camera id="user-cam" position="0 1.6 0"></a-camera>
 
-      <a-entity id="navigation-path">
-        </a-entity>
-
-      <a-entity id="destination" position="10 0.1 0">
-        <a-ring color="red" radius-inner="0.4" radius-outer="0.5" rotation="-90 0 0"></a-ring>
-        <a-text value="103-Xona" align="center" position="0 1 0" scale="2 2 2"></a-text>
-      </a-entity>
-
+        <a-entity id="world"></a-entity>
     </a-scene>
 
     <script>
-      const pathContainer = document.querySelector('#navigation-path');
-      const camera = document.querySelector('#camera');
-      const overlay = document.querySelector('#overlay');
-      const destPos = { x: 10, z: 0 }; // 10 metr o'ngga (X o'qi bo'ylab)
+        // 1. Xonalar ma'lumotlar bazasi (Koridor bo'ylab koordinatalar)
+        const rooms = {
+            "101": { x: 5, z: -2, label: "101-Xona (O'ngda)" },
+            "102": { x: -5, z: -5, label: "102-Xona (Chapda)" },
+            "103": { x: 0, z: -15, label: "103-Xona (To'g'rida)" },
+            "105": { x: 3, z: -20, label: "Adminstratsiya" }
+        };
 
-      // 1. Yo'l bo'ylab strelkalarni (array) joylashtirish
-      function buildPath() {
-        for (let i = 1; i <= 10; i++) {
-          let arrow = document.createElement('a-entity');
-          arrow.setAttribute('mixin', 'arrow-mesh');
-          // Strelkalarni har 1 metrda X o'qi bo'ylab qo'yamiz
-          arrow.setAttribute('position', `${i} 0.1 0`); 
-          // Strelka o'ngga qarashi uchun (X o'qi bo'ylab)
-          arrow.setAttribute('rotation', '0 0 -90'); 
-          pathContainer.appendChild(arrow);
+        // URL'dan xonani aniqlash: ?room=103
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetRoom = urlParams.get('room') || "103";
+        const targetData = rooms[targetRoom];
+
+        const world = document.querySelector('#world');
+        const meterEl = document.querySelector('#meter');
+        const roomNameEl = document.querySelector('#room-name');
+        const statusEl = document.querySelector('#status');
+
+        if (targetData) {
+            roomNameEl.innerText = targetData.label;
+            setupNavigation(targetData);
         }
-      }
 
-      // 2. 6DoF masofani o'lchash mantig'i
-      AFRAME.registerComponent('nav-tracker', {
-        tick: function () {
-          // Kameraning hozirgi pozitsiyasi
-          let pos = camera.object3D.position;
+        function setupNavigation(data) {
+            // 2. Yo'lga strelkalarni tizish (Har 1.5 metrda)
+            const steps = Math.abs(data.z) / 1.5;
+            for (let i = 1; i <= steps; i++) {
+                let s = document.createElement('a-entity');
+                s.setAttribute('mixin', 'arrow-style');
+                // Strelkalarni Z o'qi bo'ylab (to'g'riga) tizish
+                s.setAttribute('position', `0 0.1 ${-i * 1.5}`);
+                s.setAttribute('rotation', '-90 0 0');
+                world.appendChild(s);
+            }
 
-          // Evklid masofasi: d = sqrt((x2-x1)^2 + (z2-z1)^2)
-          let distance = Math.sqrt(
-            Math.pow(destPos.x - pos.x, 2) + 
-            Math.pow(destPos.z - pos.z, 2)
-          );
-
-          // Agar manzilga 1.5 metr qolsa
-          if (distance < 1.5) {
-            overlay.style.display = 'block';
-          } else {
-            overlay.style.display = 'none';
-          }
+            // 3. Xonaning o'ziga belgi qo'yish
+            let goal = document.createElement('a-sphere');
+            goal.setAttribute('position', `${data.x} 0.5 ${data.z}`);
+            goal.setAttribute('radius', '0.5');
+            goal.setAttribute('color', '#ff0000');
+            world.appendChild(goal);
         }
-      });
 
-      // Komponentni sahnaga qo'shish
-      document.querySelector('a-scene').setAttribute('nav-tracker', '');
+        // 4. 6DoF va 3DoF aniqlash va Masofa o'lchash
+        AFRAME.registerComponent('nav-engine', {
+            tick: function () {
+                const camPos = document.querySelector('#user-cam').object3D.position;
+                
+                // 3DoF vs 6DoF tekshiruvi (Oddiy usul: agar pozitsiya o'zgarmasa)
+                if (camPos.x === 0 && camPos.z === 0) {
+                    statusEl.innerText = "Eski telefon: Faqat yo'nalishni ko'rsatadi (3DoF)";
+                    statusEl.style.color = "yellow";
+                }
 
-      // Yo'lni chizish
-      buildPath();
+                if (targetData) {
+                    const dist = Math.sqrt(
+                        Math.pow(targetData.x - camPos.x, 2) + 
+                        Math.pow(targetData.z - camPos.z, 2)
+                    );
+                    
+                    meterEl.innerText = dist.toFixed(1);
+
+                    if (dist < 2) {
+                        statusEl.innerText = "Manzilga yetdingiz!";
+                        statusEl.style.color = "#00ff00";
+                        roomNameEl.style.color = "#00ff00";
+                    }
+                }
+            }
+        });
+
+        document.querySelector('a-scene').setAttribute('nav-engine', '');
     </script>
-  </body>
+</body>
 </html>
