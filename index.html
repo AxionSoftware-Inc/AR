@@ -1,111 +1,168 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
-    <title>Indoor AR Nav</title>
+    <title>Multi-Floor AR Nav</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
     <style>
-        /* Start ekrani - "Enter AR" tugmasi o'rniga */
-        #welcome-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #001a33; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; z-index: 9999;
-            color: white; font-family: sans-serif;
+        #ui-container {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: #000b1a;
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        #start-btn {
-            padding: 20px 40px; font-size: 20px; background: #00ff00;
-            border: none; border-radius: 50px; cursor: pointer; font-weight: bold;
+
+        .room-list {
+            width: 80%;
+            max-height: 50vh;
+            overflow-y: auto;
+            margin-top: 20px;
+            display: none;
         }
-        #ui-overlay {
-            position: absolute; bottom: 20px; width: 100%; text-align: center;
-            z-index: 100; color: white; display: none;
+
+        .room-item {
+            background: #002d5a;
+            padding: 15px;
+            margin: 5px 0;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        #hud {
+            position: fixed;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: #00ff00;
+            font-weight: bold;
+            z-index: 100;
+            display: none;
         }
     </style>
 </head>
+
 <body>
 
-    <div id="welcome-screen">
-        <h2>103-xonaga navigatsiya</h2>
-        <p>Tayyor bo'lsangiz tugmani bosing</p>
-        <button id="start-btn">BOSHLASH</button>
+    <div id="ui-container">
+        <h2 id="floor-title">Qavat aniqlanmoqda...</h2>
+        <button id="start-btn"
+            style="padding:15px 30px; border-radius:30px; border:none; background:#00ff00; font-weight:bold;">RUHSAT
+            BERISH</button>
+
+        <div class="room-list" id="room-list">
+        </div>
     </div>
 
-    <div id="ui-overlay">
-        <h1 style="margin:0;"><span id="dist">0</span> m</h1>
-        <p id="hint">O'ngga buriling!</p>
-    </div>
+    <div id="hud">Masofa: <span id="m-dist">0</span> m</div>
 
-    <a-scene webxr="requiredFeatures: local-floor" arjs-device-indicator="false">
+    <a-scene webxr="requiredFeatures: local-floor">
         <a-assets>
-            <img id="blue-arrow" src="https://cdn-icons-png.flaticon.com/512/545/545682.png">
-            <img id="goal-icon" src="https://cdn-icons-png.flaticon.com/512/684/684908.png">
+            <a-mixin id="pointer-glow" geometry="primitive: cone; radiusBottom: 0.2; height: 0.5; segmentsRadial: 3"
+                material="color: #00ccff; emissive: #00ccff; emissiveIntensity: 2; opacity: 0.9"
+                animation="property: scale; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 800">
+            </a-mixin>
         </a-assets>
 
         <a-camera id="cam" position="0 1.6 0"></a-camera>
-
-        <a-image id="turn-right-sign" src="#blue-arrow" 
-                 position="0 1.5 -1" scale="0.5 0.5 0.5"
-                 animation="property: scale; to: 0.6 0.6 0.6; dir: alternate; loop: true; dur: 500">
-        </a-image>
-
-        <a-entity id="path-container"></a-entity>
-
-        <a-image id="destination" src="#goal-icon" position="10 1 -1" visible="false"></a-image>
+        <a-entity id="ar-world"></a-entity>
     </a-scene>
 
     <script>
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentFloor = urlParams.get('floor') || "1";
+        const uiContainer = document.querySelector('#ui-container');
+        const roomList = document.querySelector('#room-list');
+        const arWorld = document.querySelector('#ar-world');
         const startBtn = document.querySelector('#start-btn');
-        const welcomeScreen = document.querySelector('#welcome-screen');
-        const scene = document.querySelector('a-scene');
-        const overlay = document.querySelector('#ui-overlay');
-        const pathContainer = document.querySelector('#path-container');
-        const turnSign = document.querySelector('#turn-right-sign');
 
-        // Navigatsiya boshlanishi (Tugma bosilganda)
-        startBtn.addEventListener('click', () => {
-            scene.enterAR(); // AR sessiyani boshlash
-            welcomeScreen.style.display = 'none';
-            overlay.style.display = 'block';
-            generatePath();
-        });
+        document.querySelector('#floor-title').innerText = currentFloor + "-qavat xonalari";
 
-        function generatePath() {
-            // Faraz qilaylik, 10 metr o'ngga yurish kerak
-            for (let i = 1; i <= 10; i++) {
-                let arrow = document.createElement('a-image');
-                arrow.setAttribute('src', '#blue-arrow');
-                // Yerda yotishi uchun rotation (X o'qi -90)
-                // O'ngga yurish uchun: X o'sib boradi
-                arrow.setAttribute('position', `${i} 0.05 0`);
-                arrow.setAttribute('rotation', '-90 0 -90'); 
-                arrow.setAttribute('scale', '0.4 0.4 0.4');
-                pathContainer.appendChild(arrow);
+        startBtn.onclick = () => {
+            document.querySelector('a-scene').enterAR();
+            startBtn.style.display = 'none';
+            roomList.style.display = 'block';
+        };
+
+        // JSON fayldan ma'lumotlarni o'qiymiz
+        fetch('floors.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("HTTP xato: " + response.status);
+                }
+                return response.json();
+            })
+            .then(db => {
+                const floorData = db[currentFloor];
+
+                if (floorData) {
+                    floorData.forEach(room => {
+                        let div = document.createElement('div');
+                        div.className = 'room-item';
+                        div.innerText = room.title;
+                        div.onclick = () => startNav(room);
+                        roomList.appendChild(div);
+                    });
+                } else {
+                    let msg = document.createElement('div');
+                    msg.style.padding = "10px";
+                    msg.innerText = "Ushbu qavat bo'yicha ma'lumot yo'q.";
+                    roomList.appendChild(msg);
+                }
+            })
+            .catch(err => {
+                console.error("Xatolik:", err);
+                let msg = document.createElement('div');
+                msg.style.padding = "10px";
+                msg.style.color = "red";
+                msg.innerText = "Ma'lumot yuklashda xatolik yuz berdi.";
+                roomList.appendChild(msg);
+            });
+
+        function startNav(room) {
+            uiContainer.style.display = 'none';
+            document.querySelector('#hud').style.display = 'block';
+
+            // 1. Dastlabki yo'nalish belgisi (O'ng/Chap)
+            let hint = document.createElement('a-entity');
+            hint.setAttribute('mixin', 'pointer-glow');
+            hint.setAttribute('position', '0 1.5 -1.5');
+            // Agar o'ngda bo'lsa o'ngga buradi
+            hint.setAttribute('rotation', room.side === "o'ng" ? '0 0 -90' : '0 0 90');
+            arWorld.appendChild(hint);
+
+            // 2. Yo'lga strelkalarni tizish
+            const dist = Math.abs(room.x);
+            for (let i = 1; i <= dist; i += 2) {
+                let s = document.createElement('a-entity');
+                s.setAttribute('mixin', 'pointer-glow');
+                s.setAttribute('position', `${room.side === "o'ng" ? i : -i} 0.1 0`);
+                s.setAttribute('rotation', `-90 0 ${room.side === "o'ng" ? -90 : 90}`);
+                arWorld.appendChild(s);
             }
+
+            window.targetPos = room;
         }
 
-        // 6DoF logic: Masofani kuzatish
-        AFRAME.registerComponent('nav-logic', {
+        // Masofani o'lchash mantig'i
+        AFRAME.registerComponent('nav-system', {
             tick: function () {
-                let camPos = document.querySelector('#cam').object3D.position;
-                let targetPos = {x: 10, z: 0};
-                
-                let dist = Math.sqrt(Math.pow(targetPos.x - camPos.x, 2) + Math.pow(targetPos.z - camPos.z, 2));
-                document.querySelector('#dist').innerText = dist.toFixed(1);
-
-                // Agar foydalanuvchi o'ngga burilsa/yursa, startdagi belgini o'chirish
-                if (camPos.x > 0.5) {
-                    turnSign.setAttribute('visible', 'false');
-                    document.querySelector('#hint').innerText = "To'g'riga yuring";
-                }
-
-                if (dist < 1.5) {
-                    document.querySelector('#hint').innerText = "YETIB KELDINGIZ!";
-                    document.querySelector('#hint').style.color = "#00ff00";
-                }
+                if (!window.targetPos) return;
+                let cam = document.querySelector('#cam').object3D.position;
+                let d = Math.sqrt(Math.pow(window.targetPos.x - cam.x, 2) + Math.pow(window.targetPos.z - cam.z, 2));
+                document.querySelector('#m-dist').innerText = d.toFixed(1);
             }
         });
-
-        scene.setAttribute('nav-logic', '');
+        document.querySelector('a-scene').setAttribute('nav-system', '');
     </script>
 </body>
+
 </html>

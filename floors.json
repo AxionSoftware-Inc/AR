@@ -1,0 +1,101 @@
+{
+    "1": [
+        {
+            "id": "101",
+            "x": 5,
+            "z": 0,
+            "side": "o'ng",
+            "title": "101-Xona (Rektorat)"
+        },
+        {
+            "id": "102",
+            "x": 10,
+            "z": 0,
+            "side": "o'ng",
+            "title": "102-Xona (Qabulxona)"
+        },
+        {
+            "id": "103",
+            "x": -5,
+            "z": 0,
+            "side": "chap",
+            "title": "103-Xona (Hisobxona)"
+        },
+        {
+            "id": "104",
+            "x": -15,
+            "z": 0,
+            "side": "chap",
+            "title": "104-Xona (Kadrlar bo'limi)"
+        }
+    ],
+    "2": [
+        {
+            "id": "201",
+            "x": 5,
+            "z": 0,
+            "side": "o'ng",
+            "title": "201-Xona (Ma'ruza zali)"
+        },
+        {
+            "id": "202",
+            "x": 8,
+            "z": 0,
+            "side": "o'ng",
+            "title": "202-Xona (Seminar xonasi)"
+        },
+        {
+            "id": "203",
+            "x": -12,
+            "z": 0,
+            "side": "chap",
+            "title": "203-Xona (Laboratoriya)"
+        },
+        {
+            "id": "204",
+            "x": -20,
+            "z": 0,
+            "side": "chap",
+            "title": "204-Xona (Kutubxona)"
+        }
+    ],
+    "3": [
+        {
+            "id": "301",
+            "x": 6,
+            "z": 0,
+            "side": "o'ng",
+            "title": "301-Xona (IT Markaz)"
+        },
+        {
+            "id": "302",
+            "x": -12,
+            "z": 0,
+            "side": "chap",
+            "title": "302-Xona (Server xonasi)"
+        },
+        {
+            "id": "303",
+            "x": 18,
+            "z": 0,
+            "side": "o'ng",
+            "title": "303-Xona (Majlislar zali)"
+        }
+    ],
+    "4": [
+        {
+            "id": "401",
+            "x": 5,
+            "z": 0,
+            "side": "o'ng",
+            "title": "401-Xona (Dekanat)"
+        },
+        {
+            "id": "402",
+            "x": -10,
+            "z": 0,
+            "side": "chap",
+            "title": "402-Xona (Kafedra)"
+        }
+    ]
+}
