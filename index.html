@@ -217,44 +217,6 @@
                 });
         }
 
-        function createArrow(x, z, angle, dirMultiplier) {
-            const el = document.createElement('a-entity');
-
-            // Kichik va yupqa uchburchak
-            el.setAttribute('geometry', {
-                primitive: 'triangle',
-                vertexA: '0 0 -0.15',   // Uchi
-                vertexB: '-0.1 0 0.15', // Orqa chap
-                vertexC: '0.1 0 0.15'   // Orqa o'ng
-            });
-
-            el.setAttribute('material', {
-                color: '#00ccff',
-                side: 'double',
-                transparent: true,
-                opacity: 0.9,
-                shader: 'flat'
-            });
-
-            el.setAttribute('position', `${x} 0.2 ${z}`);
-            el.setAttribute('rotation', `0 ${angle} 0`);
-
-            // --- PULSATSIYA MANTIG'I ---
-            // Agar o'ngga bo'lsa (dirMultiplier: 1), X o'qi bo'ylab +0.3 suriladi
-            // Agar chapga bo'lsa (dirMultiplier: -1), X o'qi bo'ylab -0.3 suriladi
-            const moveAmount = 0.3 * dirMultiplier;
-            el.setAttribute('animation', {
-                property: 'position',
-                to: `${x + moveAmount} 0.2 ${z}`,
-                dir: 'alternate',
-                loop: true,
-                dur: 800,
-                easing: 'easeInOutQuad'
-            });
-
-            return el;
-        }
-
         // 1. Ko'k strelka (Yerda yotgan, oldinga pulsatsiya qiluvchi)
         function createStepArrow(x, z, angle, dirMultiplier) {
             const el = document.createElement('a-entity');
