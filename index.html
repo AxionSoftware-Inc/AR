@@ -265,40 +265,35 @@
             targetNavData = room;
             isNavigating = true;
 
-            const sceneEl = document.querySelector('a-scene');
-            const navLogic = sceneEl.components['nav-logic'];
-            if (navLogic) navLogic.arrived = false;
-
             const turnAngle = room.side === "o'ng" ? -90 : 90;
             const dirMultiplier = room.side === "o'ng" ? 1 : -1;
 
-            // 1. Yashil Start Strelka (Ro'parada)
+            // --- START HINT (Yashil Strelka) ---
             const startArrow = document.createElement('a-entity');
-            startArrow.setAttribute('geometry', { primitive: 'triangle', vertexA: '0 0 -0.2', vertexB: '-0.15 0 0.2', vertexC: '0.15 0 0.2' });
-            startArrow.setAttribute('material', { color: '#00ff00', side: 'double', shader: 'flat', transparent: true, opacity: 0.9 });
-            startArrow.setAttribute('position', '0 1.2 -1'); // Ko'z oldida
-            startArrow.setAttribute('rotation', '90 0 0'); // Tik turgan
-            // Oldinga ishora qilib turadi
+            startArrow.setAttribute('geometry', { primitive: 'triangle', vertexA: '0 0.2 0', vertexB: '-0.15 -0.15 0', vertexC: '0.15 -0.15 0' });
+            startArrow.setAttribute('material', { color: '#00ff00', shader: 'flat', side: 'double' });
+            startArrow.setAttribute('position', '0 1.3 -1.2'); // Ko'z oldida
+
+            // O'ng yoki chapga ishora qilish
+            startArrow.setAttribute('rotation', `0 0 ${turnAngle === -90 ? -90 : 90}`);
             arWorld.appendChild(startArrow);
 
-            // 2. Manzil belgisini (Oq strelka) DARROV qo'shish
-            const doorPointer = createDoorPointer(room);
-            arWorld.appendChild(doorPointer);
+            // --- MANZIL BELGISI (Oq strelka va Matn) ---
+            arWorld.appendChild(createDoorPointer(room));
 
-            // 3. Xona nomi (Havoda)
             const text = document.createElement('a-text');
             text.setAttribute('value', room.title);
             text.setAttribute('align', 'center');
-            text.setAttribute('position', `${room.x} 1.8 ${room.side === "o'ng" ? 0.6 : -0.6}`);
+            // Matnni ham devorga qaratib qo'yamiz (Estetik uchun)
+            text.setAttribute('rotation', `0 ${turnAngle} 0`);
+            text.setAttribute('position', `${room.x} 1.9 ${room.side === "o'ng" ? 0.7 : -0.7}`);
             text.setAttribute('scale', '1.5 1.5 1.5');
             arWorld.appendChild(text);
 
-            // 4. Yerdagi yo'l strelkalari
-            const maxDist = Math.abs(room.x);
-            for (let i = 1; i < maxDist; i += 1.2) {
+            // --- YERDAGI YO'L ---
+            for (let i = 1.2; i < Math.abs(room.x); i += 1.5) {
                 let xPos = i * dirMultiplier;
-                let arrow = createArrow(xPos, 0, turnAngle, dirMultiplier);
-                arWorld.appendChild(arrow);
+                arWorld.appendChild(createStepArrow(xPos, 0, turnAngle, dirMultiplier));
             }
 
             document.querySelector('#nav-hint').innerText = `${room.side.toUpperCase()}ga buriling`;
@@ -306,16 +301,12 @@
 
         function createDoorPointer(room) {
             const el = document.createElement('a-entity');
-
-            // Uchburchakni devorga (Z o'qiga) qaratish uchun mantiq
-            // side: double - ikki tomondan ham ko'rinishi uchun
             el.setAttribute('geometry', {
                 primitive: 'triangle',
-                vertexA: '0 0 -0.3',   // Uchi
-                vertexB: '-0.2 0 0.2', // Asosi chap
-                vertexC: '0.2 0 0.2'   // Asosi o'ng
+                vertexA: '0 0.3 0',
+                vertexB: '-0.2 -0.2 0',
+                vertexC: '0.2 -0.2 0'
             });
-
             el.setAttribute('material', {
                 color: 'white',
                 shader: 'flat',
@@ -324,21 +315,17 @@
                 opacity: 0.9
             });
 
-            // POZITSIYA: Xonaning X koordinatasida, devorga yaqinroq (Z: 0.5 yoki -0.5)
-            const zPos = room.side === "o'ng" ? 0.6 : -0.6;
-            el.setAttribute('position', `${room.x} 1.3 ${zPos}`);
+            const zSide = room.side === "o'ng" ? 0.7 : -0.7;
+            el.setAttribute('position', `${room.x} 1.4 ${zSide}`);
 
-            // ROTATSIYA: Eng muhim joyi! 
-            // Eshikka (devorga) qaratish uchun Y o'qi bo'ylab buramiz.
-            // "O'ng" tomon uchun -90 (o'ngga), "Chap" uchun 90 (chapga)
+            // 2D bo'lsa ham foydalanuvchi uni ko'rishi uchun 
+            // Y o'qi bo'ylab koridorga qaratamiz
             const yRot = room.side === "o'ng" ? -90 : 90;
-            el.setAttribute('rotation', `90 ${yRot} 0`);
+            el.setAttribute('rotation', `0 ${yRot} 90`); // 90 gradus 'roll' orqali uchini devorga qaratamiz
 
-            // Animatsiya: Eshik tomonga pulsatsiya (Z o'qi bo'ylab)
-            const zMove = room.side === "o'ng" ? 0.8 : -0.8;
             el.setAttribute('animation', {
                 property: 'position',
-                to: `${room.x} 1.3 ${zMove}`,
+                to: `${room.x} 1.4 ${room.side === "o'ng" ? 0.9 : -0.9}`,
                 dir: 'alternate',
                 loop: true,
                 dur: 600,
