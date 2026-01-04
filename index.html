@@ -191,10 +191,8 @@
                     const floorData = db[currentFloor];
                     const listContainer = document.querySelector('#room-list');
 
-                    // Clear existing (keep header)
-                    while (listContainer.childNodes.length > 2) {
-                        listContainer.removeChild(listContainer.lastChild);
-                    }
+                    // Ro'yxatni tozalash (sarlavhadan tashqari)
+                    listContainer.innerHTML = '<h3 style="text-align:center; margin-top:0;">Xonani tanlang:</h3>';
 
                     if (floorData && floorData.length > 0) {
                         floorData.forEach(room => {
@@ -261,31 +259,30 @@
             roomList.style.display = 'none';
             hud.style.display = 'block';
 
-            arWorld.innerHTML = '';
+            arWorld.innerHTML = ''; // Sahna tozalash
             targetNavData = room;
             isNavigating = true;
-            this.arrived = false; // Reset status
 
-            // Navigatsiya burchagi: O'ngga = -90 gradus, Chapga = 90 gradus
+            const sceneEl = document.querySelector('a-scene');
+            const navLogic = sceneEl.components['nav-logic'];
+            if (navLogic) navLogic.arrived = false;
+
             const turnAngle = room.side === "o'ng" ? -90 : 90;
             const dirMultiplier = room.side === "o'ng" ? 1 : -1;
 
-            // --- 1. KO'Z OLDIDAGI KO'RSATMA (Face-level Hint) ---
-            const hintArrow = document.createElement('a-entity');
-            hintArrow.setAttribute('geometry', {
-                primitive: 'triangle',
-                vertexA: '0 0.2 0',
-                vertexB: '-0.15 -0.15 0',
-                vertexC: '0.15 -0.15 0'
-            });
-            hintArrow.setAttribute('material', { color: '#00ff00', shader: 'flat' });
-            hintArrow.setAttribute('position', '0 1.4 -1'); // Ro'parada
-            // Uchburchakni o'ngga yoki chapga burib qo'yamiz (Z o'qi bo'ylab rotation)
-            hintArrow.setAttribute('rotation', `0 0 ${room.side === "o'ng" ? -90 : 90}`);
-            hintArrow.setAttribute('animation', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 500');
-            arWorld.appendChild(hintArrow);
+            // 1. Manzil belgisini (Oq strelka) DARROV qo'shish
+            const doorPointer = createDoorPointer(room);
+            arWorld.appendChild(doorPointer);
 
-            // --- 2. YERDAGI KICHIK STRELKALAR (Step by Step) ---
+            // 2. Xona nomi (Havoda)
+            const text = document.createElement('a-text');
+            text.setAttribute('value', room.title);
+            text.setAttribute('align', 'center');
+            text.setAttribute('position', `${room.x} 1.8 ${room.side === "o'ng" ? 0.6 : -0.6}`);
+            text.setAttribute('scale', '1.5 1.5 1.5');
+            arWorld.appendChild(text);
+
+            // 3. Yerdagi yo'l strelkalari
             const maxDist = Math.abs(room.x);
             for (let i = 1; i < maxDist; i += 1.2) {
                 let xPos = i * dirMultiplier;
@@ -296,55 +293,61 @@
             document.querySelector('#nav-hint').innerText = `${room.side.toUpperCase()}ga buriling`;
         }
 
+        function createDoorPointer(room) {
+            const el = document.createElement('a-entity');
+
+            // Uchburchakni devorga (Z o'qiga) qaratish uchun mantiq
+            // side: double - ikki tomondan ham ko'rinishi uchun
+            el.setAttribute('geometry', {
+                primitive: 'triangle',
+                vertexA: '0 0 -0.3',   // Uchi
+                vertexB: '-0.2 0 0.2', // Asosi chap
+                vertexC: '0.2 0 0.2'   // Asosi o'ng
+            });
+
+            el.setAttribute('material', {
+                color: 'white',
+                shader: 'flat',
+                side: 'double',
+                transparent: true,
+                opacity: 0.9
+            });
+
+            // POZITSIYA: Xonaning X koordinatasida, devorga yaqinroq (Z: 0.5 yoki -0.5)
+            const zPos = room.side === "o'ng" ? 0.6 : -0.6;
+            el.setAttribute('position', `${room.x} 1.3 ${zPos}`);
+
+            // ROTATSIYA: Eng muhim joyi! 
+            // Eshikka (devorga) qaratish uchun Y o'qi bo'ylab buramiz
+            const yRot = room.side === "o'ng" ? 0 : 180;
+            el.setAttribute('rotation', `90 ${yRot} 0`);
+
+            // Animatsiya: Eshik tomonga pulsatsiya (Z o'qi bo'ylab)
+            const zMove = room.side === "o'ng" ? 0.8 : -0.8;
+            el.setAttribute('animation', {
+                property: 'position',
+                to: `${room.x} 1.3 ${zMove}`,
+                dir: 'alternate',
+                loop: true,
+                dur: 600,
+                easing: 'easeInOutQuad'
+            });
+
+            return el;
+        }
+
         // 3. Xonaga yetganda eshikni ko'rsatish
         function onDestinationReached() {
             isNavigating = false;
-            arWorld.innerHTML = ''; // Eski strelkalarni o'chirish
-
-            const rx = targetNavData.x;
-
-            // --- ESHIKKA QARAGAN OQ STRELKA (Havoda) ---
-            const doorPointer = document.createElement('a-entity');
-            doorPointer.setAttribute('geometry', {
-                primitive: 'triangle',
-                vertexA: '0 0.3 0',
-                vertexB: '-0.2 -0.2 0',
-                vertexC: '0.2 -0.2 0'
-            });
-            doorPointer.setAttribute('material', { color: 'white', shader: 'flat', side: 'double' });
-
-            // Eshik koridorning o'ng yoki chap devorida ekanini ko'rsatadi
-            // Z o'qi bo'ylab burish orqali eshikka ishora qilamiz
-            doorPointer.setAttribute('position', `${rx} 1.3 0`);
-            doorPointer.setAttribute('rotation', `0 0 ${targetNavData.side === "o'ng" ? -90 : 90}`);
-
-            // Animatsiya: Eshik tomon "itariq" berish
-            const sideMove = targetNavData.side === "o'ng" ? 0.4 : -0.4;
-            doorPointer.setAttribute('animation', {
-                property: 'position',
-                to: `${rx} 1.3 ${sideMove}`,
-                dir: 'alternate',
-                loop: true,
-                dur: 600
-            });
-
-            const text = document.createElement('a-text');
-            text.setAttribute('value', targetNavData.title);
-            text.setAttribute('align', 'center');
-            text.setAttribute('position', `${rx} 1.8 0`);
-            text.setAttribute('scale', '1.5 1.5 1.5');
-
-            arWorld.appendChild(doorPointer);
-            arWorld.appendChild(text);
+            // arWorld.innerHTML = ''; // Buni olib tashladik, hamma narsa qoladi!
 
             document.querySelector('#nav-hint').innerHTML = `
-        <div style="color:#00ff00; font-size:1.5rem">YETIB KELDINGIZ</div>
-        <button onclick="location.reload()" style="margin-top:10px; padding:10px; border-radius:10px; border:none; background:white; font-weight:bold;">Menyuga qaytish</button>
+        <div style="color:#00ff00; font-size:1.5rem">SIZ YETIB KELDINGIZ</div>
+        <button onclick="resetToMenu()" style="margin-top:10px; padding:10px 20px; border-radius:10px; border:none; background:white; font-weight:bold; cursor:pointer;">Tugatish</button>
     `;
 
-            if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]);
+            if (window.navigator.vibrate) window.navigator.vibrate([300, 100, 300]);
         }
-
         // 4. Masofani kuzatish mantiqi (nav-logic component)
 
 
