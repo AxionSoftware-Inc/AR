@@ -191,8 +191,10 @@
                     const floorData = db[currentFloor];
                     const listContainer = document.querySelector('#room-list');
 
-                    // Ro'yxatni tozalash (sarlavhadan tashqari)
-                    listContainer.innerHTML = '<h3 style="text-align:center; margin-top:0;">Xonani tanlang:</h3>';
+                    // Clear existing (keep header)
+                    while (listContainer.childNodes.length > 2) {
+                        listContainer.removeChild(listContainer.lastChild);
+                    }
 
                     if (floorData && floorData.length > 0) {
                         floorData.forEach(room => {
@@ -343,7 +345,7 @@
 
             document.querySelector('#nav-hint').innerHTML = `
         <div style="color:#00ff00; font-size:1.5rem">SIZ YETIB KELDINGIZ</div>
-        <button onclick="resetToMenu()" style="margin-top:10px; padding:10px 20px; border-radius:10px; border:none; background:white; font-weight:bold; cursor:pointer;">Tugatish</button>
+        <button onclick="location.reload()" style="margin-top:10px; padding:10px; border-radius:10px; border:none; background:white; font-weight:bold;">Tugatish</button>
     `;
 
             if (window.navigator.vibrate) window.navigator.vibrate([300, 100, 300]);
