@@ -217,35 +217,35 @@
                 });
         }
 
-        function createArrow(x, z, angle, color = "#00aaff") {
+        function createArrow(x, z, angle, dirMultiplier) {
             const el = document.createElement('a-entity');
 
-            // Kichikroq va chiroyliroq uchburchak (0.15 - 3 barobar kichik)
+            // Kichik va yupqa uchburchak
             el.setAttribute('geometry', {
                 primitive: 'triangle',
-                vertexA: '0 0 -0.2',   // Uchi
-                vertexB: '-0.12 0 0.2', // Orqa chap
-                vertexC: '0.12 0 0.2'   // Orqa o'ng
+                vertexA: '0 0 -0.15',   // Uchi
+                vertexB: '-0.1 0 0.15', // Orqa chap
+                vertexC: '0.1 0 0.15'   // Orqa o'ng
             });
 
             el.setAttribute('material', {
-                color: color,
+                color: '#00ccff',
                 side: 'double',
                 transparent: true,
                 opacity: 0.9,
-                shader: 'flat',
-                emissive: color,
-                emissiveIntensity: 1
+                shader: 'flat'
             });
 
-            el.setAttribute('position', `${x} 0.2 ${z}`); // Yerga yaqinroq
+            el.setAttribute('position', `${x} 0.2 ${z}`);
             el.setAttribute('rotation', `0 ${angle} 0`);
 
-            // Oldinga-orqaga harakat (Forward Pulse)
-            // -0.2 metrga oldinga surilib turadi
+            // --- PULSATSIYA MANTIG'I ---
+            // Agar o'ngga bo'lsa (dirMultiplier: 1), X o'qi bo'ylab +0.3 suriladi
+            // Agar chapga bo'lsa (dirMultiplier: -1), X o'qi bo'ylab -0.3 suriladi
+            const moveAmount = 0.3 * dirMultiplier;
             el.setAttribute('animation', {
                 property: 'position',
-                to: `${x + Math.sin(angle * Math.PI / 180) * 0.3} 0.2 ${z + Math.cos(angle * Math.PI / 180) * 0.3}`,
+                to: `${x + moveAmount} 0.2 ${z}`,
                 dir: 'alternate',
                 loop: true,
                 dur: 800,
@@ -255,6 +255,7 @@
             return el;
         }
 
+        // 2. Navigatsiyani boshlash
         function startNavigation(room) {
             startScreen.style.display = 'none';
             roomList.style.display = 'none';
@@ -263,101 +264,89 @@
             arWorld.innerHTML = '';
             targetNavData = room;
             isNavigating = true;
+            this.arrived = false; // Reset status
 
+            // Navigatsiya burchagi: O'ngga = -90 gradus, Chapga = 90 gradus
             const turnAngle = room.side === "o'ng" ? -90 : 90;
+            const dirMultiplier = room.side === "o'ng" ? 1 : -1;
 
-            // --- KO'Z OLDIDAGI KATTA BELGI (Turn Hint) ---
+            // --- 1. KO'Z OLDIDAGI KO'RSATMA (Face-level Hint) ---
             const hintArrow = document.createElement('a-entity');
             hintArrow.setAttribute('geometry', {
+                primitive: 'triangle',
+                vertexA: '0 0.2 0',
+                vertexB: '-0.15 -0.15 0',
+                vertexC: '0.15 -0.15 0'
+            });
+            hintArrow.setAttribute('material', { color: '#00ff00', shader: 'flat' });
+            hintArrow.setAttribute('position', '0 1.4 -1'); // Ro'parada
+            // Uchburchakni o'ngga yoki chapga burib qo'yamiz (Z o'qi bo'ylab rotation)
+            hintArrow.setAttribute('rotation', `0 0 ${room.side === "o'ng" ? -90 : 90}`);
+            hintArrow.setAttribute('animation', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 500');
+            arWorld.appendChild(hintArrow);
+
+            // --- 2. YERDAGI KICHIK STRELKALAR (Step by Step) ---
+            const maxDist = Math.abs(room.x);
+            for (let i = 1; i < maxDist; i += 1.2) {
+                let xPos = i * dirMultiplier;
+                let arrow = createArrow(xPos, 0, turnAngle, dirMultiplier);
+                arWorld.appendChild(arrow);
+            }
+
+            document.querySelector('#nav-hint').innerText = `${room.side.toUpperCase()}ga buriling`;
+        }
+
+        // 3. Xonaga yetganda eshikni ko'rsatish
+        function onDestinationReached() {
+            isNavigating = false;
+            arWorld.innerHTML = ''; // Eski strelkalarni o'chirish
+
+            const rx = targetNavData.x;
+
+            // --- ESHIKKA QARAGAN OQ STRELKA (Havoda) ---
+            const doorPointer = document.createElement('a-entity');
+            doorPointer.setAttribute('geometry', {
                 primitive: 'triangle',
                 vertexA: '0 0.3 0',
                 vertexB: '-0.2 -0.2 0',
                 vertexC: '0.2 -0.2 0'
             });
-            hintArrow.setAttribute('material', { color: '#00ff00', shader: 'flat' });
-            hintArrow.setAttribute('position', '0 1.4 -1.2'); // Ko'z darajasida
-            hintArrow.setAttribute('rotation', `0 0 ${turnAngle === -90 ? -90 : 90}`);
+            doorPointer.setAttribute('material', { color: 'white', shader: 'flat', side: 'double' });
 
-            // Titrab turish animatsiyasi
-            hintArrow.setAttribute('animation', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 400');
-            arWorld.appendChild(hintArrow);
+            // Eshik koridorning o'ng yoki chap devorida ekanini ko'rsatadi
+            // Z o'qi bo'ylab burish orqali eshikka ishora qilamiz
+            doorPointer.setAttribute('position', `${rx} 1.3 0`);
+            doorPointer.setAttribute('rotation', `0 0 ${targetNavData.side === "o'ng" ? -90 : 90}`);
 
-            // --- YERDAGI KICHIK STRELKALAR ---
-            const maxDist = Math.abs(room.x);
-            const step = 1.0; // Strelkalar orasidagi masofa
-            const dirMultiplier = room.side === "o'ng" ? 1 : -1;
-
-            for (let i = 1; i < maxDist; i += step) {
-                let xPos = i * dirMultiplier;
-                let arrow = createArrow(xPos, 0, turnAngle);
-                arWorld.appendChild(arrow);
-            }
-
-            document.querySelector('#nav-hint').innerText = `${room.side.toUpperCase()}ga buriling va yuring`;
-        }
-
-        // Navigation Loop
-        AFRAME.registerComponent('nav-logic', {
-            tick: function () {
-                if (!isNavigating || !targetNavData) return;
-
-                const camPos = this.el.camera.el.object3D.position;
-
-                // Calculate distance to the target X code
-                // Target is at {x: room.x, z: 0}
-                const dx = targetNavData.x - camPos.x;
-                const dz = (targetNavData.z || 0) - camPos.z;
-                const distance = Math.sqrt(dx * dx + dz * dz);
-
-                document.querySelector('#m-dist').innerText = distance.toFixed(1);
-
-                // Check Arrival
-                if (distance < 2.0) { // 2 meters threshold
-                    if (!this.arrived) {
-                        this.arrived = true;
-                        onDestinationReached();
-                    }
-                } else {
-                    this.arrived = false;
-                }
-            }
-        });
-
-        // 1. Manzilga yetganda ishlash funksiyasini yangilaymiz
-        function onDestinationReached() {
-            isNavigating = false;
-            arWorld.innerHTML = '';
-
-            const rx = targetNavData.x;
-            const rz = targetNavData.z || 0;
-
-            // Xonani ko'rsatuvchi katta OQ strelka (Havoda)
-            const arrivalPointer = document.createElement('a-entity');
-            arrivalPointer.setAttribute('geometry', {
-                primitive: 'cone',
-                radiusBottom: 0.15,
-                height: 0.5
+            // Animatsiya: Eshik tomon "itariq" berish
+            const sideMove = targetNavData.side === "o'ng" ? 0.4 : -0.4;
+            doorPointer.setAttribute('animation', {
+                property: 'position',
+                to: `${rx} 1.3 ${sideMove}`,
+                dir: 'alternate',
+                loop: true,
+                dur: 600
             });
-            arrivalPointer.setAttribute('material', { color: '#ffffff', emissive: '#ffffff' });
-
-            // Strelkani eshik tomon burib qo'yamiz
-            // Agar xona o'ngda bo'lsa, koridor o'rtasidan o'ngga qarashi kerak
-            arrivalPointer.setAttribute('position', `${rx} 1.2 ${rz}`);
-            arrivalPointer.setAttribute('rotation', `0 0 ${targetNavData.side === "o'ng" ? -90 : 90}`);
-
-            arrivalPointer.setAttribute('animation', 'property: position; to: ' + (rx + (targetNavData.side === "o'ng" ? 0.5 : -0.5)) + ' 1.2 ' + rz + '; dir: alternate; loop: true; dur: 500');
 
             const text = document.createElement('a-text');
             text.setAttribute('value', targetNavData.title);
             text.setAttribute('align', 'center');
-            text.setAttribute('position', `${rx} 1.8 ${rz}`);
+            text.setAttribute('position', `${rx} 1.8 0`);
             text.setAttribute('scale', '1.5 1.5 1.5');
 
-            arWorld.appendChild(arrivalPointer);
+            arWorld.appendChild(doorPointer);
             arWorld.appendChild(text);
 
-            document.querySelector('#nav-hint').innerHTML = `<button onclick="location.reload()" style="padding:10px; border-radius:10px; background:white; font-weight:bold;">Tugatish</button>`;
+            document.querySelector('#nav-hint').innerHTML = `
+        <div style="color:#00ff00; font-size:1.5rem">YETIB KELDINGIZ</div>
+        <button onclick="location.reload()" style="margin-top:10px; padding:10px; border-radius:10px; border:none; background:white; font-weight:bold;">Menyuga qaytish</button>
+    `;
+
+            if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]);
         }
+
+        // 4. Masofani kuzatish mantiqi (nav-logic component)
+
 
         // 2. Menyuga qaytish funksiyasi
         window.resetToMenu = function () {
@@ -378,13 +367,15 @@
                 if (!isNavigating || !targetNavData) return;
 
                 const camPos = this.el.camera.el.object3D.position;
+
+                // 2D masofa (X va Z bo'yicha)
                 const dx = targetNavData.x - camPos.x;
-                const dz = (targetNavData.z || 0) - camPos.z;
+                const dz = (targetNavData.z || 0) - camPos.z; // Z koordinatasi bo'lsa
                 const distance = Math.sqrt(dx * dx + dz * dz);
 
                 document.querySelector('#m-dist').innerText = distance.toFixed(1);
 
-                if (distance < 1.8 && !this.arrived) { // Threshold biroz qisqartirildi
+                if (distance < 1.2 && !this.arrived) {
                     this.arrived = true;
                     onDestinationReached();
                 }
