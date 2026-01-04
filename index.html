@@ -272,11 +272,20 @@
             const turnAngle = room.side === "o'ng" ? -90 : 90;
             const dirMultiplier = room.side === "o'ng" ? 1 : -1;
 
-            // 1. Manzil belgisini (Oq strelka) DARROV qo'shish
+            // 1. Yashil Start Strelka (Ro'parada)
+            const startArrow = document.createElement('a-entity');
+            startArrow.setAttribute('geometry', { primitive: 'triangle', vertexA: '0 0 -0.2', vertexB: '-0.15 0 0.2', vertexC: '0.15 0 0.2' });
+            startArrow.setAttribute('material', { color: '#00ff00', side: 'double', shader: 'flat', transparent: true, opacity: 0.9 });
+            startArrow.setAttribute('position', '0 1.2 -1'); // Ko'z oldida
+            startArrow.setAttribute('rotation', '90 0 0'); // Tik turgan
+            // Oldinga ishora qilib turadi
+            arWorld.appendChild(startArrow);
+
+            // 2. Manzil belgisini (Oq strelka) DARROV qo'shish
             const doorPointer = createDoorPointer(room);
             arWorld.appendChild(doorPointer);
 
-            // 2. Xona nomi (Havoda)
+            // 3. Xona nomi (Havoda)
             const text = document.createElement('a-text');
             text.setAttribute('value', room.title);
             text.setAttribute('align', 'center');
@@ -284,7 +293,7 @@
             text.setAttribute('scale', '1.5 1.5 1.5');
             arWorld.appendChild(text);
 
-            // 3. Yerdagi yo'l strelkalari
+            // 4. Yerdagi yo'l strelkalari
             const maxDist = Math.abs(room.x);
             for (let i = 1; i < maxDist; i += 1.2) {
                 let xPos = i * dirMultiplier;
@@ -320,8 +329,9 @@
             el.setAttribute('position', `${room.x} 1.3 ${zPos}`);
 
             // ROTATSIYA: Eng muhim joyi! 
-            // Eshikka (devorga) qaratish uchun Y o'qi bo'ylab buramiz
-            const yRot = room.side === "o'ng" ? 0 : 180;
+            // Eshikka (devorga) qaratish uchun Y o'qi bo'ylab buramiz.
+            // "O'ng" tomon uchun -90 (o'ngga), "Chap" uchun 90 (chapga)
+            const yRot = room.side === "o'ng" ? -90 : 90;
             el.setAttribute('rotation', `90 ${yRot} 0`);
 
             // Animatsiya: Eshik tomonga pulsatsiya (Z o'qi bo'ylab)
