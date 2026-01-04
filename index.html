@@ -10,158 +10,381 @@
             position: fixed;
             inset: 0;
             z-index: 999;
-            background: #000b1a;
+            background: rgba(0, 11, 26, 0.9);
             color: white;
-            font-family: sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            pointer-events: auto;
         }
 
         .room-list {
-            width: 80%;
-            max-height: 50vh;
+            width: 85%;
+            max-height: 60vh;
             overflow-y: auto;
             margin-top: 20px;
             display: none;
+            /* Hidden initially until Start is clicked */
+            background: rgba(0, 45, 90, 0.5);
+            border-radius: 15px;
+            padding: 10px;
+            backdrop-filter: blur(5px);
         }
 
         .room-item {
-            background: #002d5a;
+            background: rgba(0, 80, 160, 0.8);
             padding: 15px;
-            margin: 5px 0;
-            border-radius: 8px;
+            margin: 8px 0;
+            border-radius: 10px;
             text-align: center;
+            font-weight: bold;
             cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            border: 1px solid #00aaff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .room-item:active {
+            transform: scale(0.98);
+            background: #00ccff;
+            color: #000;
         }
 
         #hud {
             position: fixed;
             top: 20px;
+            left: 0;
             width: 100%;
             text-align: center;
             color: #00ff00;
             font-weight: bold;
-            z-index: 100;
+            font-size: 1.2rem;
+            text-shadow: 2px 2px 2px black;
+            z-index: 1000;
             display: none;
+            pointer-events: none;
+        }
+
+        #start-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .btn-start {
+            padding: 20px 50px;
+            border-radius: 50px;
+            border: none;
+            background: linear-gradient(45deg, #00ff00, #00cc00);
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            cursor: pointer;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 20px rgba(0, 255, 0, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 255, 0, 0);
+            }
         }
     </style>
 </head>
 
 <body>
 
+    <!-- UI Overlay for DOM usage in WebXR -->
     <div id="ui-container">
-        <h2 id="floor-title">Qavat aniqlanmoqda...</h2>
-        <button id="start-btn"
-            style="padding:15px 30px; border-radius:30px; border:none; background:#00ff00; font-weight:bold;">RUHSAT
-            BERISH</button>
+        <div id="start-screen">
+            <h1 id="floor-title" style="text-align: center; margin: 0; font-size: 2rem;">AR Navigatsiya</h1>
+            <p style="color: #ccc;">Manzilga oson yetib boring</p>
+            <button class="btn-start" id="start-btn">BOSHLASH</button>
+        </div>
 
         <div class="room-list" id="room-list">
+            <h3 style="text-align:center; margin-top:0;">Xonani tanlang:</h3>
         </div>
     </div>
 
-    <div id="hud">Masofa: <span id="m-dist">0</span> m</div>
+    <div id="hud">
+        <div>Masofa: <span id="m-dist">0</span> m</div>
+        <div id="nav-hint" style="font-size: 0.9rem; color: #fff;"></div>
+    </div>
 
-    <a-scene webxr="requiredFeatures: local-floor">
+    <!-- WebXR Scene with dom-overlay enabled -->
+    <a-scene webxr="requiredFeatures: local-floor, dom-overlay; overlayElement: #ui-container"
+        renderer="antialias: true; colorManagement: true;" vr-mode-ui="enabled: false">
+
         <a-assets>
-            <a-mixin id="pointer-glow" geometry="primitive: cone; radiusBottom: 0.2; height: 0.5; segmentsRadial: 3"
-                material="color: #00ccff; emissive: #00ccff; emissiveIntensity: 2; opacity: 0.9"
-                animation="property: scale; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 800">
+            <!-- Destination Marker Mixin -->
+            <a-mixin id="dest-marker" geometry="primitive: cone; radiusBottom: 0.5; height: 1.5; segmentsRadial: 8"
+                material="color: #00ff00; emissive: #00ff00; emissiveIntensity: 0.8; opacity: 0.8"
+                animation="property: position; from: 0 2 0; to: 0 1.5 0; dir: alternate; loop: true; dur: 1000; easing: easeInOutQuad">
             </a-mixin>
         </a-assets>
 
-        <a-camera id="cam" position="0 1.6 0"></a-camera>
-        <a-entity id="ar-world"></a-entity>
+        <a-camera id="cam" position="0 1.6 0" look-controls="enabled: false"></a-camera>
+        <a-entity id="ar-world" position="0 0 0"></a-entity>
     </a-scene>
 
     <script>
-
         const urlParams = new URLSearchParams(window.location.search);
         const currentFloor = urlParams.get('floor') || "1";
         const uiContainer = document.querySelector('#ui-container');
+        const startScreen = document.querySelector('#start-screen');
         const roomList = document.querySelector('#room-list');
         const arWorld = document.querySelector('#ar-world');
         const startBtn = document.querySelector('#start-btn');
+        const hud = document.querySelector('#hud');
 
-        document.querySelector('#floor-title').innerText = currentFloor + "-qavat xonalari";
+        let targetNavData = null;
+        let isNavigating = false;
 
-        startBtn.onclick = () => {
-            document.querySelector('a-scene').enterAR();
-            startBtn.style.display = 'none';
-            roomList.style.display = 'block';
+        document.querySelector('#floor-title').innerText = currentFloor + "-qavat";
+
+        // Initialize Permissions and Start AR Session
+        startBtn.onclick = async () => {
+            try {
+                // Request Device Orientation Permission (iOS 13+)
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const response = await DeviceOrientationEvent.requestPermission();
+                    if (response !== 'granted') {
+                        alert("Iltimos, datchiklarga ruxsat bering!");
+                        return;
+                    }
+                }
+
+                // Enter AR Scene
+                const scene = document.querySelector('a-scene');
+                await scene.enterAR();
+
+                // Switch UI: Hide Start Button, Show Room List
+                startScreen.style.display = 'none';
+                roomList.style.display = 'block';
+
+                // Ensure room list is populated
+                loadFloorData();
+
+            } catch (e) {
+                console.error(e);
+                alert("Xatolik: " + e.message);
+            }
         };
 
-        // JSON fayldan ma'lumotlarni o'qiymiz
-        fetch('floors.json')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("HTTP xato: " + response.status);
-                }
-                return response.json();
-            })
-            .then(db => {
-                const floorData = db[currentFloor];
+        function loadFloorData() {
+            fetch('floors.json')
+                .then(res => res.json())
+                .then(db => {
+                    const floorData = db[currentFloor];
+                    const listContainer = document.querySelector('#room-list');
 
-                if (floorData) {
-                    floorData.forEach(room => {
-                        let div = document.createElement('div');
-                        div.className = 'room-item';
-                        div.innerText = room.title;
-                        div.onclick = () => startNav(room);
-                        roomList.appendChild(div);
-                    });
-                } else {
-                    let msg = document.createElement('div');
-                    msg.style.padding = "10px";
-                    msg.innerText = "Ushbu qavat bo'yicha ma'lumot yo'q.";
-                    roomList.appendChild(msg);
-                }
-            })
-            .catch(err => {
-                console.error("Xatolik:", err);
-                let msg = document.createElement('div');
-                msg.style.padding = "10px";
-                msg.style.color = "red";
-                msg.innerText = "Ma'lumot yuklashda xatolik yuz berdi.";
-                roomList.appendChild(msg);
-            });
+                    // Clear existing (keep header)
+                    while (listContainer.childNodes.length > 2) {
+                        listContainer.removeChild(listContainer.lastChild);
+                    }
 
-        function startNav(room) {
-            uiContainer.style.display = 'none';
-            document.querySelector('#hud').style.display = 'block';
-
-            // 1. Dastlabki yo'nalish belgisi (O'ng/Chap)
-            let hint = document.createElement('a-entity');
-            hint.setAttribute('mixin', 'pointer-glow');
-            hint.setAttribute('position', '0 1.5 -1.5');
-            // Agar o'ngda bo'lsa o'ngga buradi
-            hint.setAttribute('rotation', room.side === "o'ng" ? '0 0 -90' : '0 0 90');
-            arWorld.appendChild(hint);
-
-            // 2. Yo'lga strelkalarni tizish
-            const dist = Math.abs(room.x);
-            for (let i = 1; i <= dist; i += 2) {
-                let s = document.createElement('a-entity');
-                s.setAttribute('mixin', 'pointer-glow');
-                s.setAttribute('position', `${room.side === "o'ng" ? i : -i} 0.1 0`);
-                s.setAttribute('rotation', `-90 0 ${room.side === "o'ng" ? -90 : 90}`);
-                arWorld.appendChild(s);
-            }
-
-            window.targetPos = room;
+                    if (floorData && floorData.length > 0) {
+                        floorData.forEach(room => {
+                            let div = document.createElement('div');
+                            div.className = 'room-item';
+                            div.innerHTML = `<div style="font-size:1.2em">${room.title}</div>`;
+                            div.onclick = (e) => {
+                                e.stopPropagation(); // Prevent clicking through to background
+                                startNavigation(room);
+                            };
+                            listContainer.appendChild(div);
+                        });
+                    } else {
+                        listContainer.innerHTML += `<div style="padding:20px; text-align:center">Bu qavat uchun ma'lumot topilmadi.</div>`;
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Ma'lumotlarni yuklashda xatolik.");
+                });
         }
 
-        // Masofani o'lchash mantig'i
-        AFRAME.registerComponent('nav-system', {
+        function createArrow(x, z, angle, color = "#00aaff") {
+            const el = document.createElement('a-entity');
+
+            // 2D Triangle using native geometry
+            // vertex coordinates to make an isosceles triangle pointing along negative Z (default forward)
+            el.setAttribute('geometry', {
+                primitive: 'triangle',
+                vertexA: '0 0 -0.5',   // Tip
+                vertexB: '-0.4 0 0.5', // Back Left
+                vertexC: '0.4 0 0.5'   // Back Right
+            });
+
+            el.setAttribute('material', {
+                color: color,
+                side: 'double',
+                transparent: true,
+                opacity: 0.9,
+                shader: 'flat'
+            });
+
+            // Position and Rotation
+            // Floating slightly (0.3m)
+            el.setAttribute('position', `${x} 0.3 ${z}`);
+            el.setAttribute('rotation', `0 ${angle} 0`);
+
+            // Animation (Floating effect + Slight scale)
+            el.setAttribute('animation', {
+                property: 'position',
+                to: `${x} 0.5 ${z}`,
+                dir: 'alternate',
+                loop: true,
+                dur: 1500,
+                easing: 'easeInOutSine'
+            });
+
+            return el;
+        }
+
+        function startNavigation(room) {
+            // Hide full UI, show HUD
+            // Keep uiContainer for overlay contexts if needed, but hide content
+            startScreen.style.display = 'none';
+            roomList.style.display = 'none';
+            hud.style.display = 'block';
+
+            // Reset World
+            arWorld.innerHTML = '';
+            targetNavData = room;
+            isNavigating = true;
+
+            // Logic: Assume corridor is Left/Right (X-axis).
+            // Start at 0,0.
+
+            // Turning Arrow at Origin
+            const turnAngle = room.side === "o'ng" ? -90 : 90; // -90=Right, 90=Left
+
+            // 1. Initial Arrow (at feet)
+            const startArrow = createArrow(0, 0, turnAngle);
+            arWorld.appendChild(startArrow);
+
+            // 2. Path Arrows
+            const maxDist = Math.abs(room.x);
+            const step = 1.5; // meters gap
+            const dirMultiplier = room.side === "o'ng" ? 1 : -1;
+
+            // Create arrows along the path
+            for (let i = 1; i < maxDist - 0.5; i += step) {
+                let xPos = i * dirMultiplier;
+                let arrow = createArrow(xPos, 0, turnAngle);
+                arWorld.appendChild(arrow);
+            }
+
+            // Update Hint
+            document.querySelector('#nav-hint').innerText = `${room.title} tomon yuring`;
+        }
+
+        // Navigation Loop
+        AFRAME.registerComponent('nav-logic', {
             tick: function () {
-                if (!window.targetPos) return;
-                let cam = document.querySelector('#cam').object3D.position;
-                let d = Math.sqrt(Math.pow(window.targetPos.x - cam.x, 2) + Math.pow(window.targetPos.z - cam.z, 2));
-                document.querySelector('#m-dist').innerText = d.toFixed(1);
+                if (!isNavigating || !targetNavData) return;
+
+                const camPos = this.el.camera.el.object3D.position;
+
+                // Calculate distance to the target X code
+                // Target is at {x: room.x, z: 0}
+                const dx = targetNavData.x - camPos.x;
+                const dz = (targetNavData.z || 0) - camPos.z;
+                const distance = Math.sqrt(dx * dx + dz * dz);
+
+                document.querySelector('#m-dist').innerText = distance.toFixed(1);
+
+                // Check Arrival
+                if (distance < 2.0) { // 2 meters threshold
+                    if (!this.arrived) {
+                        this.arrived = true;
+                        onDestinationReached();
+                    }
+                } else {
+                    this.arrived = false;
+                }
             }
         });
-        document.querySelector('a-scene').setAttribute('nav-system', '');
+
+        // 1. Manzilga yetganda ishlash funksiyasini yangilaymiz
+        function onDestinationReached() {
+            isNavigating = false; // Navigatsiyani to'xtatamiz
+            arWorld.innerHTML = '';
+
+            const rx = targetNavData.x;
+            const rz = targetNavData.z || 0;
+
+            const marker = document.createElement('a-entity');
+            marker.setAttribute('mixin', 'dest-marker');
+            marker.setAttribute('position', `${rx} 0 ${rz}`);
+
+            const text = document.createElement('a-text');
+            text.setAttribute('value', "MANZILGA KELDINGIZ");
+            text.setAttribute('align', 'center');
+            text.setAttribute('position', '0 2.5 0');
+            text.setAttribute('scale', '2 2 2');
+
+            marker.appendChild(text);
+            arWorld.appendChild(marker);
+
+            document.querySelector('#nav-hint').innerHTML = `
+        <button onclick="resetToMenu()" style="padding:10px; background:#00ff00; border:none; border-radius:10px; font-weight:bold;">
+            Yangi xona tanlash
+        </button>`;
+            hud.style.color = "#00ff00";
+
+            // Android qurilmalarda tebranish (vibration)
+            if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200]);
+        }
+
+        // 2. Menyuga qaytish funksiyasi
+        window.resetToMenu = function () {
+            isNavigating = false;
+            targetNavData = null;
+            arWorld.innerHTML = '';
+            hud.style.display = 'none';
+            roomList.style.display = 'block'; // Ro'yxatni qayta ko'rsatamiz
+            hud.style.color = "#00ff00";
+        };
+
+        // 3. Navigatsiya mantiqi (tick)
+        AFRAME.registerComponent('nav-logic', {
+            init: function () {
+                this.arrived = false;
+            },
+            tick: function () {
+                if (!isNavigating || !targetNavData) return;
+
+                const camPos = this.el.camera.el.object3D.position;
+                const dx = targetNavData.x - camPos.x;
+                const dz = (targetNavData.z || 0) - camPos.z;
+                const distance = Math.sqrt(dx * dx + dz * dz);
+
+                document.querySelector('#m-dist').innerText = distance.toFixed(1);
+
+                if (distance < 1.8 && !this.arrived) { // Threshold biroz qisqartirildi
+                    this.arrived = true;
+                    onDestinationReached();
+                }
+            }
+        });
+
+        document.querySelector('a-scene').setAttribute('nav-logic', '');
+
     </script>
 </body>
 
